@@ -1,0 +1,28 @@
+{
+  "version": 1,
+  "saved_at": "2026-04-12T14:35:20Z",
+  "focus_data": {
+    "status": "\ud83d\udd34 DISTRACTED",
+    "score": 20,
+    "total_time": 67,
+    "ai": {
+      "productivity": 21,
+      "phone_risk": false,
+      "fatigue_risk": false,
+      "hint": "Engaged \u2014 posture and attention look on track."
+    }
+  },
+  "history": [
+    {
+      "total_time": 67,
+      "score": 20,
+      "status": "\ud83d\udd34 DISTRACTED",
+      "ai": {
+        "productivity": 21,
+        "phone_risk": false,
+        "fatigue_risk": false,
+        "hint": "Engaged \u2014 posture and attention look on track."
+      }
+    }
+  ]
+}

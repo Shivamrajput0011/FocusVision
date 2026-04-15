@@ -1,0 +1,1435 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Focus Level AI</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;0,700;1,500&display=swap" rel="stylesheet" />
+  <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <style>
+    :root {
+      --bg-deep: #030508;
+      --card: rgba(18, 22, 32, 0.72);
+      --card-border: rgba(255, 255, 255, 0.08);
+      --text: #f1f5f9;
+      --muted: #94a3b8;
+      --accent: #38bdf8;
+      --accent-soft: rgba(56, 189, 248, 0.14);
+      --violet-glow: rgba(139, 92, 246, 0.22);
+      --shadow-card: 0 4px 24px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(255, 255, 255, 0.04);
+      --shadow-card-hover: 0 12px 40px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(56, 189, 248, 0.12);
+      --radius: 16px;
+      --radius-lg: 20px;
+      --radius-xl: 26px;
+      --focus: rgba(56, 189, 248, 0.45);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: "Plus Jakarta Sans", system-ui, -apple-system, sans-serif;
+      color: var(--text);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: clamp(1.25rem, 4vw, 2.5rem);
+      background-color: var(--bg-deep);
+      background-image:
+        radial-gradient(ellipse 120% 80% at 50% -30%, rgba(56, 189, 248, 0.18), transparent 55%),
+        radial-gradient(ellipse 70% 50% at 100% 0%, var(--violet-glow), transparent 50%),
+        radial-gradient(ellipse 60% 45% at 0% 100%, rgba(14, 165, 233, 0.12), transparent 50%),
+        linear-gradient(180deg, #05080d 0%, #020305 50%, #000000 100%);
+      background-attachment: fixed;
+    }
+    body::before {
+      content: "";
+      position: fixed;
+      inset: -40px;
+      pointer-events: none;
+      background:
+        radial-gradient(600px 250px at 20% 15%, rgba(56, 189, 248, 0.10), transparent 65%),
+        radial-gradient(520px 260px at 80% 12%, rgba(139, 92, 246, 0.12), transparent 60%),
+        radial-gradient(540px 340px at 70% 88%, rgba(14, 165, 233, 0.08), transparent 55%);
+      filter: blur(2px);
+      opacity: 0.95;
+      z-index: -1;
+    }
+    body.has-page-bg {
+      background-image:
+        linear-gradient(160deg, rgba(2, 3, 6, 0.92) 0%, rgba(8, 12, 22, 0.88) 45%, rgba(3, 5, 12, 0.94) 100%),
+        radial-gradient(ellipse 100% 70% at 50% -20%, rgba(56, 189, 248, 0.15), transparent 55%),
+        var(--page-bg-image);
+      background-size: cover, cover, cover;
+      background-position: center, center, center;
+      background-repeat: no-repeat;
+      background-attachment: fixed;
+    }
+    .shell {
+      width: min(100%, 1120px);
+      margin: 0 auto;
+      text-align: center;
+    }
+    .brand {
+      margin-bottom: clamp(1.5rem, 4vw, 2.25rem);
+    }
+    h1 {
+      font-weight: 700;
+      font-size: clamp(1.35rem, 3vw, 1.65rem);
+      margin: 0;
+      letter-spacing: -0.03em;
+      line-height: 1.2;
+    }
+    .brand-sub {
+      margin: 0.5rem 0 0;
+      font-size: 0.875rem;
+      font-weight: 500;
+      color: var(--muted);
+      letter-spacing: 0.02em;
+    }
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.75rem;
+      padding: 0.95rem 1.05rem;
+      border-radius: var(--radius-xl);
+      background: rgba(12, 16, 28, 0.55);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      box-shadow: 0 14px 50px rgba(0, 0, 0, 0.40), 0 0 0 1px rgba(255, 255, 255, 0.03);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      text-align: left;
+      margin-bottom: clamp(1rem, 3vw, 1.35rem);
+    }
+    .topbar__left {
+      display: flex;
+      flex-direction: column;
+      gap: 0.15rem;
+      min-width: 0;
+    }
+    .topbar__title {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      min-width: 0;
+    }
+    .app-icon {
+      width: 40px;
+      height: 40px;
+      border-radius: 14px;
+      background: linear-gradient(135deg, rgba(56, 189, 248, 0.18) 0%, rgba(139, 92, 246, 0.16) 60%, rgba(14, 165, 233, 0.12) 100%);
+      border: 1px solid rgba(255, 255, 255, 0.10);
+      box-shadow: 0 12px 34px rgba(0, 0, 0, 0.35);
+      display: grid;
+      place-items: center;
+      flex: 0 0 auto;
+    }
+    .app-icon svg { width: 20px; height: 20px; color: rgba(241, 245, 249, 0.92); }
+    .topbar__title h1 {
+      font-size: 1.02rem;
+      letter-spacing: -0.02em;
+      line-height: 1.15;
+      margin: 0;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .topbar__subtitle {
+      margin: 0;
+      font-size: 0.82rem;
+      color: var(--muted);
+      font-weight: 500;
+    }
+    .topbar__right {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      flex: 0 0 auto;
+    }
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.45rem;
+      padding: 0.4rem 0.65rem;
+      border-radius: 999px;
+      border: 1px solid rgba(255, 255, 255, 0.10);
+      background: rgba(255, 255, 255, 0.04);
+      color: rgba(226, 232, 240, 0.92);
+      font-size: 0.74rem;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+      user-select: none;
+      white-space: nowrap;
+    }
+    .pill svg { width: 14px; height: 14px; opacity: 0.9; }
+    @media (max-width: 520px) {
+      .topbar { flex-direction: column; align-items: stretch; text-align: center; }
+      .topbar__title { justify-content: center; }
+      .topbar__right { justify-content: center; flex-wrap: wrap; }
+    }
+    .metrics-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: clamp(0.85rem, 2.5vw, 1.25rem);
+      margin-bottom: clamp(0.85rem, 2vw, 1.1rem);
+      width: 100%;
+    }
+    @media (min-width: 900px) {
+      .metrics-grid {
+        grid-template-columns: repeat(4, 1fr);
+      }
+    }
+    @media (max-width: 640px) {
+      .metrics-grid {
+        grid-template-columns: 1fr;
+        max-width: 22rem;
+        margin-left: auto;
+        margin-right: auto;
+      }
+    }
+    .ai-insight {
+      margin-bottom: clamp(1rem, 3vw, 1.35rem);
+      padding: 0.85rem 1rem;
+      border-radius: var(--radius-lg);
+      background: rgba(12, 16, 28, 0.55);
+      border: 1px solid rgba(56, 189, 248, 0.15);
+      text-align: center;
+    }
+    .ai-insight__badges {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.45rem;
+      justify-content: center;
+      margin-bottom: 0.55rem;
+    }
+    .ai-badge {
+      font-size: 0.68rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      padding: 0.3rem 0.55rem;
+      border-radius: 999px;
+      border: 1px solid transparent;
+    }
+    .ai-badge--phone {
+      color: #fdba74;
+      background: rgba(251, 146, 60, 0.12);
+      border-color: rgba(251, 146, 60, 0.35);
+    }
+    .ai-badge--fatigue {
+      color: #c4b5fd;
+      background: rgba(139, 92, 246, 0.12);
+      border-color: rgba(167, 139, 250, 0.35);
+    }
+    .ai-insight__hint {
+      margin: 0;
+      font-size: 0.8125rem;
+      font-weight: 500;
+      color: var(--muted);
+      line-height: 1.5;
+      max-width: 36rem;
+      margin-left: auto;
+      margin-right: auto;
+    }
+    .metric-card {
+      background: var(--card);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border-radius: var(--radius-lg);
+      padding: clamp(1.25rem, 3vw, 1.65rem) clamp(1rem, 2.5vw, 1.35rem);
+      border: 1px solid var(--card-border);
+      box-shadow: var(--shadow-card);
+      text-align: center;
+      transition: transform 0.22s ease, box-shadow 0.22s ease, border-color 0.22s ease;
+      position: relative;
+      overflow: hidden;
+    }
+    .metric-card::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      background: radial-gradient(500px 160px at 50% 0%, rgba(56, 189, 248, 0.12), transparent 55%);
+      opacity: 0;
+      transition: opacity 0.22s ease;
+    }
+    .metric-card:hover {
+      transform: translateY(-6px) scale(1.01);
+      box-shadow: var(--shadow-card-hover);
+      border-color: rgba(56, 189, 248, 0.2);
+    }
+    .metric-card:hover::after { opacity: 1; }
+    .metric-icon {
+      width: 40px;
+      height: 40px;
+      margin: 0 auto 0.85rem;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: linear-gradient(135deg, rgba(56, 189, 248, 0.18) 0%, rgba(139, 92, 246, 0.14) 55%, rgba(14, 165, 233, 0.10) 100%);
+      border: 1px solid rgba(255, 255, 255, 0.10);
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+    }
+    .metric-icon svg {
+      width: 18px;
+      height: 18px;
+      color: rgba(241, 245, 249, 0.92);
+    }
+    .metric-label {
+      margin: 0 0 0.5rem;
+      font-size: 0.7rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      color: var(--muted);
+    }
+    .metric-value {
+      margin: 0;
+      font-size: clamp(1.5rem, 4vw, 2rem);
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+      letter-spacing: -0.02em;
+      line-height: 1.15;
+      background: linear-gradient(135deg, #f8fafc 0%, #cbd5e1 100%);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+    }
+    .metric-value--status {
+      font-size: clamp(1rem, 2.8vw, 1.25rem);
+      font-weight: 600;
+      line-height: 1.35;
+    }
+    #status {
+      /* status emoji + text: keep readable without gradient clipping issues */
+      background: none;
+      -webkit-background-clip: unset;
+      background-clip: unset;
+      color: var(--text);
+    }
+    .hint {
+      margin-top: 1.5rem;
+      font-size: 0.8125rem;
+      color: var(--muted);
+      text-align: center;
+      max-width: 32rem;
+      margin-left: auto;
+      margin-right: auto;
+      line-height: 1.55;
+    }
+    .live {
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--accent);
+      margin-right: 8px;
+      vertical-align: middle;
+      box-shadow: 0 0 12px rgba(56, 189, 248, 0.65);
+      animation: pulse 1.5s ease infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
+    .layout {
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      gap: clamp(1rem, 2.5vw, 1.35rem);
+      align-items: stretch;
+    }
+    .main-grid {
+      width: 100%;
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: clamp(1rem, 2.5vw, 1.35rem);
+      align-items: start;
+    }
+    @media (min-width: 980px) {
+      .main-grid {
+        grid-template-columns: 1.1fr 0.9fr;
+      }
+      .graph-card { grid-column: 1 / 2; }
+      .coach-card { grid-column: 2 / 3; }
+      .summary-card, .ai-insight { grid-column: 1 / -1; }
+    }
+    .card {
+      background: var(--card);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border-radius: var(--radius-lg);
+      padding: clamp(1.25rem, 3vw, 1.65rem);
+      border: 1px solid var(--card-border);
+      box-shadow: var(--shadow-card);
+      text-align: center;
+      transition: transform 0.22s ease, box-shadow 0.22s ease, border-color 0.22s ease;
+      position: relative;
+      overflow: hidden;
+    }
+    .card::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      background: radial-gradient(700px 200px at 50% 0%, rgba(139, 92, 246, 0.10), transparent 58%);
+      opacity: 0;
+      transition: opacity 0.22s ease;
+    }
+    .card:hover {
+      transform: translateY(-5px);
+      box-shadow: var(--shadow-card-hover);
+      border-color: rgba(56, 189, 248, 0.15);
+    }
+    .card:hover::after { opacity: 1; }
+    .assist-title {
+      font-size: 0.95rem;
+      font-weight: 600;
+      margin: 0 0 0.75rem;
+      color: var(--muted);
+      letter-spacing: 0.02em;
+    }
+    .assist-log {
+      max-height: 200px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 0.65rem;
+      margin-bottom: 0.75rem;
+      padding-right: 0.25rem;
+    }
+    .assist-msg {
+      font-size: 0.875rem;
+      line-height: 1.45;
+      padding: 0.55rem 0.7rem;
+      border-radius: 8px;
+      max-width: 100%;
+    }
+    .assist-msg.bot {
+      background: var(--accent-soft);
+      border: 1px solid rgba(56, 189, 248, 0.22);
+      align-self: flex-start;
+    }
+    .assist-msg.user {
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      align-self: flex-end;
+    }
+    .assist-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.4rem;
+      margin-bottom: 0.65rem;
+      justify-content: center;
+    }
+    .assist-chips button {
+      font-size: 0.72rem;
+      padding: 0.35rem 0.55rem;
+      border-radius: 999px;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      background: rgba(255, 255, 255, 0.05);
+      color: var(--text);
+      cursor: pointer;
+      font-family: inherit;
+    }
+    .assist-chips button:hover {
+      background: rgba(56, 189, 248, 0.12);
+      border-color: rgba(56, 189, 248, 0.35);
+    }
+    .assist-form {
+      display: flex;
+      gap: 0.5rem;
+      justify-content: center;
+      max-width: 28rem;
+      margin-left: auto;
+      margin-right: auto;
+    }
+    .assist-form input {
+      flex: 1;
+      min-width: 0;
+      padding: 0.55rem 0.65rem;
+      border-radius: 8px;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      background: rgba(0, 0, 0, 0.25);
+      color: var(--text);
+      font-size: 0.875rem;
+      font-family: inherit;
+      outline: none;
+      transition: box-shadow 0.18s ease, border-color 0.18s ease;
+    }
+    .assist-form input:focus {
+      border-color: rgba(56, 189, 248, 0.35);
+      box-shadow: 0 0 0 4px rgba(56, 189, 248, 0.12);
+    }
+    .assist-form input::placeholder { color: var(--muted); opacity: 0.8; }
+    .assist-form button {
+      padding: 0.55rem 0.9rem;
+      border-radius: 8px;
+      border: none;
+      background: var(--accent);
+      color: #0a1628;
+      font-weight: 600;
+      font-size: 0.8rem;
+      cursor: pointer;
+      font-family: inherit;
+      transition: transform 0.15s ease, filter 0.15s ease;
+    }
+    .assist-form button:hover { filter: brightness(1.08); }
+    .assist-form button:active { transform: translateY(1px); }
+    .graph-card {
+      padding: clamp(1.25rem, 3vw, 1.65rem);
+    }
+    .graph-head {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      margin-bottom: 1rem;
+      gap: 0.35rem;
+      text-align: center;
+    }
+    .graph-head .label { margin: 0; }
+    .graph-trend {
+      font-size: 0.8rem;
+      color: var(--muted);
+      font-variant-numeric: tabular-nums;
+    }
+    .graph-wrap {
+      position: relative;
+      width: 100%;
+      max-width: 100%;
+      height: min(260px, 42vw);
+      min-height: 200px;
+      border-radius: var(--radius);
+      background: rgba(0, 0, 0, 0.35);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      overflow: hidden;
+      padding: 0.35rem 0.25rem 0.15rem;
+    }
+    #focus-chart {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+    .visually-hidden {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
+    .focus-low-banner {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      margin: 0 0 clamp(0.75rem, 2vw, 1rem);
+      padding: 0.65rem 1rem;
+      border-radius: var(--radius);
+      background: rgba(239, 68, 68, 0.1);
+      border: 1px solid rgba(248, 113, 113, 0.35);
+      box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.2);
+    }
+    .focus-low-banner[hidden] {
+      display: none;
+    }
+    .focus-low-banner__text {
+      margin: 0;
+      font-size: 0.8125rem;
+      font-weight: 600;
+      color: #fca5a5;
+      letter-spacing: 0.01em;
+      line-height: 1.4;
+    }
+    .focus-toast {
+      position: fixed;
+      z-index: 10000;
+      left: 50%;
+      bottom: max(1.25rem, env(safe-area-inset-bottom, 0px));
+      transform: translateX(-50%) translateY(120%);
+      max-width: min(22rem, calc(100vw - 2rem));
+      padding: 0.85rem 1.25rem;
+      margin: 0;
+      font-size: 0.9375rem;
+      font-weight: 600;
+      font-family: inherit;
+      color: #fef2f2;
+      text-align: center;
+      background: rgba(30, 10, 12, 0.92);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid rgba(248, 113, 113, 0.45);
+      border-radius: 14px;
+      box-shadow:
+        0 12px 40px rgba(0, 0, 0, 0.5),
+        0 0 0 1px rgba(255, 255, 255, 0.06);
+      opacity: 0;
+      pointer-events: none;
+      transition:
+        transform 0.35s cubic-bezier(0.22, 1, 0.36, 1),
+        opacity 0.3s ease;
+    }
+    .focus-toast.focus-toast--visible {
+      transform: translateX(-50%) translateY(0);
+      opacity: 1;
+      pointer-events: auto;
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .focus-toast {
+        transition: opacity 0.2s ease;
+        transform: translateX(-50%);
+      }
+      .focus-toast:not(.focus-toast--visible) {
+        opacity: 0;
+      }
+      .focus-toast.focus-toast--visible {
+        transform: translateX(-50%);
+      }
+    }
+    .summary-card {
+      text-align: center;
+    }
+    .summary-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem 1.25rem;
+      margin-bottom: 1rem;
+    }
+    @media (max-width: 480px) {
+      .summary-grid {
+        grid-template-columns: 1fr;
+        gap: 0.85rem;
+      }
+    }
+    .summary-stat {
+      padding: 0.75rem 0.85rem;
+      border-radius: var(--radius);
+      background: rgba(0, 0, 0, 0.22);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+    }
+    .summary-stat__label {
+      display: block;
+      font-size: 0.68rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--muted);
+      margin-bottom: 0.35rem;
+    }
+    .summary-stat__value {
+      font-size: 1.35rem;
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+      color: var(--text);
+      letter-spacing: -0.02em;
+    }
+    .summary-verdict {
+      margin: 0;
+      padding: 0.65rem 1rem;
+      border-radius: var(--radius);
+      font-size: 0.875rem;
+      font-weight: 600;
+      line-height: 1.4;
+      border: 1px solid transparent;
+    }
+    .summary-verdict--neutral {
+      color: var(--muted);
+      background: rgba(255, 255, 255, 0.04);
+      border-color: rgba(255, 255, 255, 0.08);
+    }
+    .summary-verdict--good {
+      color: #86efac;
+      background: rgba(34, 197, 94, 0.1);
+      border-color: rgba(74, 222, 128, 0.28);
+    }
+    .summary-verdict--improve {
+      color: #fca5a5;
+      background: rgba(239, 68, 68, 0.1);
+      border-color: rgba(248, 113, 113, 0.3);
+    }
+    .summary-verdict--fair {
+      color: #fde68a;
+      background: rgba(234, 179, 8, 0.1);
+      border-color: rgba(250, 204, 21, 0.25);
+    }
+  </style>
+</head>
+<body
+  data-initial-total-time="{{ focus_data.total_time | default(0) | int }}"
+  data-initial-score="{{ focus_data.score | default(0) | int }}"
+  {% if background_url %}class="has-page-bg" style="--page-bg-image: url('{{ background_url }}');"{% endif %}>
+  <div class="shell">
+  <div class="layout">
+  {% set ai = focus_data.get('ai', {}) %}
+  <header class="topbar" aria-label="Dashboard header">
+    <div class="topbar__left">
+      <div class="topbar__title">
+        <div class="app-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M12 3v3m0 12v3M21 12h-3M6 12H3" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            <path d="M12 7a5 5 0 1 0 0 10a5 5 0 0 0 0-10Z" stroke="currentColor" stroke-width="2" />
+          </svg>
+        </div>
+        <h1><span class="live" aria-hidden="true"></span>Focus Level AI</h1>
+      </div>
+      <p class="topbar__subtitle">Premium session dashboard</p>
+    </div>
+    <div class="topbar__right" aria-label="Live status badges">
+      <span class="pill" title="Live streaming enabled">
+        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <path d="M15 9a4 4 0 0 1 0 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+          <path d="M18 6a8 8 0 0 1 0 12" stroke="currentColor" stroke-width="2" stroke-linecap="round" opacity="0.7"/>
+          <path d="M12 12h.01" stroke="currentColor" stroke-width="4" stroke-linecap="round"/>
+        </svg>
+        Live
+      </span>
+      <span class="pill" id="pill-session-time" title="Current session duration">
+        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <path d="M12 8v5l3 2" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M12 22a10 10 0 1 0-10-10a10 10 0 0 0 10 10Z" stroke="currentColor" stroke-width="2"/>
+        </svg>
+        <span id="pill-session-time-value">0s</span>
+      </span>
+    </div>
+  </header>
+  <div id="focus-low-banner" class="focus-low-banner" role="alert" aria-live="polite" hidden>
+    <p class="focus-low-banner__text">Warning: focus score is below 40%.</p>
+  </div>
+  <div class="metrics-grid" role="group" aria-label="Session metrics">
+    <article class="metric-card">
+      <div class="metric-icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <path d="M12 22a10 10 0 1 0-10-10a10 10 0 0 0 10 10Z" stroke="currentColor" stroke-width="2"/>
+          <path d="M12 7v5l4 2" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </div>
+      <p class="metric-label">Focus Score</p>
+      <p class="metric-value" id="score">{{ focus_data.score }}%</p>
+    </article>
+    <article class="metric-card">
+      <div class="metric-icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <path d="M12 21s7-4.5 7-11a7 7 0 1 0-14 0c0 6.5 7 11 7 11Z" stroke="currentColor" stroke-width="2"/>
+          <path d="M12 10h.01" stroke="currentColor" stroke-width="4" stroke-linecap="round"/>
+        </svg>
+      </div>
+      <p class="metric-label">Status</p>
+      <p class="metric-value metric-value--status" id="status">{{ focus_data.status }}</p>
+    </article>
+    <article class="metric-card">
+      <div class="metric-icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <path d="M12 8v4l3 2" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M12 22a10 10 0 1 0-10-10a10 10 0 0 0 10 10Z" stroke="currentColor" stroke-width="2"/>
+          <path d="M9 2h6" stroke="currentColor" stroke-width="2" stroke-linecap="round" opacity="0.6"/>
+        </svg>
+      </div>
+      <p class="metric-label">Session Time</p>
+      <p class="metric-value" id="time">{{ focus_data.total_time }}s</p>
+    </article>
+    <article class="metric-card">
+      <div class="metric-icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <path d="M12 2l2.4 7.2L22 12l-7.6 2.8L12 22l-2.4-7.2L2 12l7.6-2.8L12 2Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+        </svg>
+      </div>
+      <p class="metric-label">Productivity Score</p>
+      <p class="metric-value" id="productivity">{{ ai.get('productivity', 0) }}%</p>
+    </article>
+  </div>
+
+  <div class="main-grid" aria-label="Dashboard content">
+    <div class="ai-insight" aria-label="AI posture and attention hints">
+      <div class="ai-insight__badges">
+        <span id="ai-phone-badge" class="ai-badge ai-badge--phone" {% if not ai.get('phone_risk') %}hidden{% endif %}>Look-down / phone</span>
+        <span id="ai-fatigue-badge" class="ai-badge ai-badge--fatigue" {% if not ai.get('fatigue_risk') %}hidden{% endif %}>Fatigue / eyes</span>
+      </div>
+      <p class="ai-insight__hint" id="ai-hint">{{ ai.get('hint', 'Smart posture & attention tracking active.')|e }}</p>
+    </div>
+
+    <section class="card summary-card" aria-labelledby="summary-title">
+      <h2 id="summary-title" class="assist-title" style="margin:0 0 1rem;">Session summary</h2>
+      <div class="summary-grid">
+        <div class="summary-stat">
+          <span class="summary-stat__label">Total session time</span>
+          <span class="summary-stat__value" id="summary-session-time">0s</span>
+        </div>
+        <div class="summary-stat">
+          <span class="summary-stat__label">Average focus score</span>
+          <span class="summary-stat__value" id="summary-avg-score">—</span>
+        </div>
+      </div>
+      <p class="summary-verdict summary-verdict--neutral" id="summary-verdict">Collecting session data…</p>
+    </section>
+
+    <div class="card graph-card" aria-labelledby="graph-title">
+      <div class="graph-head">
+        <h2 id="graph-title" class="assist-title" style="margin:0;">Focus over time</h2>
+        <span class="graph-trend" id="graph-trend-label">Trend: —</span>
+      </div>
+      <div class="graph-wrap">
+        <canvas id="focus-chart" aria-label="Focus score over session time"></canvas>
+      </div>
+    </div>
+
+    <div class="card coach-card" aria-labelledby="assist-title">
+      <h2 id="assist-title" class="assist-title">Focus coach</h2>
+      <div id="assist-log" class="assist-log" aria-live="polite"></div>
+      <div class="assist-chips" id="assist-chips">
+        <button type="button" data-prompt="How is my focus today?">How is my focus today?</button>
+        <button type="button" data-prompt="Why is my focus low?">Why is my focus low?</button>
+        <button type="button" data-prompt="How can I improve my score?">How to improve?</button>
+        <button type="button" data-prompt="What does my score mean?">What does my score mean?</button>
+      </div>
+      <form class="assist-form" id="assist-form" autocomplete="off">
+        <label for="assist-input" class="visually-hidden">Message to focus coach</label>
+        <input id="assist-input" type="text" placeholder="Ask for tips or about your score…" />
+        <button type="submit">Send</button>
+      </form>
+    </div>
+  </div>
+
+  <p class="hint">Run <code>python main.py</code> with this page open to stream webcam focus stats here.</p>
+  </div>
+  </div>
+  <div id="focus-toast" class="focus-toast" role="status" aria-live="assertive" aria-hidden="true"></div>
+  <script>
+    const socket = io();
+    const el = (id) => document.getElementById(id);
+
+    const FOCUS_LOW_THRESHOLD = 40;
+    const FOCUS_ALERT_COOLDOWN_MS = 5000;
+    const FOCUS_TOAST_MS = 4000;
+    let focusAlertNextAllowedAt = 0;
+    let focusToastHideTimer = null;
+
+    const SCORE_HISTORY_MAX = 90;
+    const scoreHistory = [];
+
+    let sessionScoreSum = 0;
+    let sessionScoreCount = 0;
+    let sessionTotalTimeSec =
+      Math.max(
+        0,
+        parseInt(document.body.getAttribute("data-initial-total-time") || "0", 10) || 0
+      );
+
+    function formatDurationSeconds(sec) {
+      const s = Math.max(0, Math.floor(Number(sec) || 0));
+      if (s < 60) return `${s}s`;
+      const m = Math.floor(s / 60);
+      const r = s % 60;
+      return r === 0 ? `${m}m` : `${m}m ${r}s`;
+    }
+
+    function renderSessionSummary() {
+      const timeEl = el("summary-session-time");
+      const avgEl = el("summary-avg-score");
+      const verdictEl = el("summary-verdict");
+      if (!timeEl || !avgEl || !verdictEl) return;
+
+      timeEl.textContent = formatDurationSeconds(sessionTotalTimeSec);
+      const pillTime = el("pill-session-time-value");
+      if (pillTime) pillTime.textContent = formatDurationSeconds(sessionTotalTimeSec);
+
+      let avgRounded = null;
+      if (sessionScoreCount > 0) {
+        avgRounded = Math.round(sessionScoreSum / sessionScoreCount);
+        avgEl.textContent = `${avgRounded}%`;
+      } else {
+        avgEl.textContent = "—";
+      }
+
+      verdictEl.classList.remove(
+        "summary-verdict--neutral",
+        "summary-verdict--good",
+        "summary-verdict--improve",
+        "summary-verdict--fair"
+      );
+
+      if (sessionScoreCount === 0) {
+        verdictEl.textContent = "Collecting session data…";
+        verdictEl.classList.add("summary-verdict--neutral");
+        return;
+      }
+
+      if (avgRounded > 70) {
+        verdictEl.textContent = "Good";
+        verdictEl.classList.add("summary-verdict--good");
+      } else if (avgRounded < 50) {
+        verdictEl.textContent = "Needs Improvement";
+        verdictEl.classList.add("summary-verdict--improve");
+      } else {
+        verdictEl.textContent = "Fair — aim for above 70%";
+        verdictEl.classList.add("summary-verdict--fair");
+      }
+    }
+
+    function recordSessionScoreSample(s) {
+      const v = clampScore(Number(s));
+      sessionScoreSum += v;
+      sessionScoreCount += 1;
+      renderSessionSummary();
+    }
+
+    function updateSessionTotalTime(t) {
+      const n = Math.max(0, Math.floor(Number(t) || 0));
+      if (n >= sessionTotalTimeSec) sessionTotalTimeSec = n;
+      renderSessionSummary();
+    }
+
+    function renderMetricSessionTime(t) {
+      const timeCard = el("time");
+      if (!timeCard) return;
+      timeCard.textContent = formatDurationSeconds(t);
+    }
+
+    function clampScore(n) {
+      return Math.min(100, Math.max(0, n));
+    }
+
+    function syncAiFromPayload(ai) {
+      if (!ai || typeof ai !== "object") return;
+      const prodEl = el("productivity");
+      if (prodEl) {
+        const p = Math.round(Number(ai.productivity));
+        prodEl.textContent = (Number.isFinite(p) ? p : 0) + "%";
+      }
+      const hintEl = el("ai-hint");
+      if (hintEl && typeof ai.hint === "string") hintEl.textContent = ai.hint;
+      const phoneB = el("ai-phone-badge");
+      const fatB = el("ai-fatigue-badge");
+      if (phoneB) phoneB.hidden = !ai.phone_risk;
+      if (fatB) fatB.hidden = !ai.fatigue_risk;
+    }
+
+    function showFocusKaroToast() {
+      const toast = el("focus-toast");
+      if (!toast) return;
+      toast.textContent = "Focus karo!";
+      toast.classList.add("focus-toast--visible");
+      toast.setAttribute("aria-hidden", "false");
+      if (focusToastHideTimer) clearTimeout(focusToastHideTimer);
+      focusToastHideTimer = setTimeout(() => {
+        toast.classList.remove("focus-toast--visible");
+        toast.setAttribute("aria-hidden", "true");
+        focusToastHideTimer = null;
+      }, FOCUS_TOAST_MS);
+    }
+
+    function syncLowFocusAlerts(score) {
+      const s = clampScore(Number(score));
+      const banner = el("focus-low-banner");
+      if (banner) {
+        banner.hidden = s >= FOCUS_LOW_THRESHOLD;
+      }
+      if (s >= FOCUS_LOW_THRESHOLD) {
+        focusAlertNextAllowedAt = 0;
+        return;
+      }
+      const now = Date.now();
+      if (now < focusAlertNextAllowedAt) return;
+      focusAlertNextAllowedAt = now + FOCUS_ALERT_COOLDOWN_MS;
+      showFocusKaroToast();
+    }
+
+    function parseScoreFromUi() {
+      const raw = (el("score").textContent || "0").replace(/%/g, "").trim();
+      const n = parseInt(raw, 10);
+      return Number.isFinite(n) ? clampScore(n) : 0;
+    }
+
+    function avg(arr) {
+      if (!arr.length) return 0;
+      return arr.reduce((a, b) => a + b, 0) / arr.length;
+    }
+
+    /** @returns { key: string, label: string, phrase: string } */
+    function getGraphTrend() {
+      const h = scoreHistory;
+      if (h.length < 6) {
+        return {
+          key: "steady",
+          label: "steady",
+          phrase: "your graph is still warming up—keep going! ➡️",
+        };
+      }
+      const half = Math.floor(h.length / 2);
+      const firstAvg = avg(h.slice(0, half));
+      const secondAvg = avg(h.slice(half));
+      const diff = secondAvg - firstAvg;
+      if (diff > 4) {
+        return {
+          key: "rising",
+          label: "rising",
+          phrase: "rising on the graph 📈",
+        };
+      }
+      if (diff < -4) {
+        return {
+          key: "falling",
+          label: "falling",
+          phrase: "sliding down on the graph 📉",
+        };
+      }
+      return {
+        key: "steady",
+        label: "steady",
+        phrase: "pretty steady on the graph ➡️",
+      };
+    }
+
+    function updateTrendLabel() {
+      const trend = getGraphTrend();
+      el("graph-trend-label").textContent = "Trend: " + trend.label;
+    }
+
+    const CHART_POLL_MS = 2000;
+    const CHART_MAX_POINTS = 90;
+    /** @type {Chart|null} */
+    let focusLineChart = null;
+    let lastChartSampleKey = null;
+
+    function sessionTimeLabel(totalSeconds) {
+      const s = Math.max(0, Math.floor(Number(totalSeconds) || 0));
+      const m = Math.floor(s / 60);
+      const r = s % 60;
+      if (m <= 0) return `${r}s`;
+      return `${m}:${String(r).padStart(2, "0")}`;
+    }
+
+    function createFocusLineChart() {
+      const canvas = el("focus-chart");
+      if (!canvas || typeof Chart === "undefined") return null;
+      const accent = "rgb(56, 189, 248)";
+      const muted = "rgb(148, 163, 184)";
+      const font = "'Plus Jakarta Sans', system-ui, sans-serif";
+
+      return new Chart(canvas, {
+        type: "line",
+        data: {
+          labels: [],
+          datasets: [
+            {
+              label: "Focus score",
+              data: [],
+              borderColor: accent,
+              backgroundColor: "rgba(56, 189, 248, 0.14)",
+              borderWidth: 2,
+              fill: true,
+              tension: 0.38,
+              cubicInterpolationMode: "monotone",
+              pointRadius: 0,
+              pointHoverRadius: 5,
+              pointHoverBackgroundColor: accent,
+              pointHoverBorderWidth: 0,
+            },
+          ],
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          interaction: { intersect: false, mode: "index" },
+          animation: {
+            duration: 450,
+            easing: "easeOutCubic",
+          },
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              backgroundColor: "rgba(15, 23, 42, 0.94)",
+              borderColor: "rgba(148, 163, 184, 0.25)",
+              borderWidth: 1,
+              padding: 10,
+              titleColor: "#f1f5f9",
+              bodyColor: "#cbd5e1",
+              displayColors: false,
+              callbacks: {
+                title: (items) => {
+                  const i = items[0]?.dataIndex;
+                  const raw = focusLineChart?.data.labels[i];
+                  return raw != null ? `Time: ${raw}` : "";
+                },
+                label: (item) => `Focus: ${item.parsed.y}%`,
+              },
+            },
+          },
+          scales: {
+            x: {
+              title: {
+                display: true,
+                text: "Session time",
+                color: muted,
+                font: { size: 11, family: font },
+              },
+              grid: { color: "rgba(148, 163, 184, 0.12)" },
+              ticks: {
+                color: muted,
+                maxRotation: 0,
+                autoSkip: true,
+                maxTicksLimit: 7,
+                font: { size: 10, family: font },
+              },
+              border: { display: false },
+            },
+            y: {
+              min: 0,
+              max: 100,
+              title: {
+                display: true,
+                text: "Focus score (%)",
+                color: muted,
+                font: { size: 11, family: font },
+              },
+              grid: { color: "rgba(148, 163, 184, 0.12)" },
+              ticks: {
+                color: muted,
+                stepSize: 25,
+                font: { size: 10, family: font },
+              },
+              border: { display: false },
+            },
+          },
+        },
+      });
+    }
+
+    function pushChartSample(totalTime, score, useQuietUpdate) {
+      if (!focusLineChart) return;
+      const t = Math.max(0, Math.floor(Number(totalTime) || 0));
+      const s = clampScore(Number(score));
+      const key = `${t}:${s}`;
+      if (lastChartSampleKey === key) return;
+      lastChartSampleKey = key;
+
+      const label = sessionTimeLabel(t);
+      focusLineChart.data.labels.push(label);
+      focusLineChart.data.datasets[0].data.push(s);
+      while (focusLineChart.data.labels.length > CHART_MAX_POINTS) {
+        focusLineChart.data.labels.shift();
+        focusLineChart.data.datasets[0].data.shift();
+      }
+      if (useQuietUpdate) focusLineChart.update("none");
+      else focusLineChart.update();
+    }
+
+    function loadChartFromHistory(samples) {
+      if (!focusLineChart || !samples?.length) return;
+      const labels = [];
+      const data = [];
+      for (let i = 0; i < samples.length; i++) {
+        const p = samples[i];
+        const t = Math.max(0, Math.floor(Number(p.total_time) || 0));
+        const s = clampScore(Number(p.score));
+        labels.push(sessionTimeLabel(t));
+        data.push(s);
+      }
+      const start = Math.max(0, labels.length - CHART_MAX_POINTS);
+      focusLineChart.data.labels = labels.slice(start);
+      focusLineChart.data.datasets[0].data = data.slice(start);
+      const last = samples[samples.length - 1];
+      lastChartSampleKey = `${Math.floor(Number(last.total_time) || 0)}:${clampScore(Number(last.score))}`;
+      focusLineChart.update("none");
+    }
+
+    function hydrateScoreHistoryFromSamples(samples) {
+      scoreHistory.length = 0;
+      if (!samples?.length) return;
+      const scores = samples.map((p) => clampScore(Number(p.score)));
+      const tail = scores.slice(-SCORE_HISTORY_MAX);
+      for (let i = 0; i < tail.length; i++) scoreHistory.push(tail[i]);
+    }
+
+    function hydrateSessionFromHistory(samples) {
+      sessionScoreSum = 0;
+      sessionScoreCount = 0;
+      let maxT = 0;
+      if (!samples?.length) {
+        renderSessionSummary();
+        return;
+      }
+      for (let i = 0; i < samples.length; i++) {
+        const p = samples[i];
+        sessionScoreSum += clampScore(Number(p.score));
+        sessionScoreCount += 1;
+        const tt = Math.floor(Number(p.total_time) || 0);
+        if (tt > maxT) maxT = tt;
+      }
+      sessionTotalTimeSec = Math.max(sessionTotalTimeSec, maxT);
+      renderSessionSummary();
+    }
+
+    async function pollFocusDataFromApi() {
+      try {
+        const res = await fetch("/data", { cache: "no-store" });
+        if (!res.ok) return;
+        const d = await res.json();
+        const t = d.total_time != null ? Number(d.total_time) : 0;
+        const s = d.score != null ? clampScore(Number(d.score)) : 0;
+        if (d.total_time != null) {
+          updateSessionTotalTime(d.total_time);
+          renderMetricSessionTime(d.total_time);
+        }
+        if (d.score != null) syncLowFocusAlerts(s);
+        if (d.ai != null && typeof d.ai === "object") syncAiFromPayload(d.ai);
+        pushChartSample(t, s, false);
+      } catch (e) {
+        console.warn("Focus data poll failed", e);
+      }
+    }
+
+    function apply(data) {
+      if (!data) return;
+      if (data.status != null) el("status").textContent = data.status;
+      if (data.score != null) {
+        const s = clampScore(Number(data.score));
+        el("score").textContent = s + "%";
+        scoreHistory.push(s);
+        if (scoreHistory.length > SCORE_HISTORY_MAX) {
+          scoreHistory.shift();
+        }
+        syncLowFocusAlerts(s);
+        recordSessionScoreSample(s);
+      }
+      if (data.total_time != null) {
+        renderMetricSessionTime(data.total_time);
+        updateSessionTotalTime(data.total_time);
+      }
+      if (data.ai != null && typeof data.ai === "object") syncAiFromPayload(data.ai);
+      updateTrendLabel();
+    }
+
+    socket.on("connect", () => console.log("Socket connected"));
+    socket.on("focus_update", apply);
+
+    async function bootstrapChartFromStorage() {
+      focusLineChart = createFocusLineChart();
+      const bootT = Math.max(
+        0,
+        parseInt(document.body.getAttribute("data-initial-total-time") || "0", 10) || 0
+      );
+      const bootS = clampScore(
+        parseInt(document.body.getAttribute("data-initial-score") || "0", 10) || 0
+      );
+      if (!focusLineChart) {
+        setInterval(pollFocusDataFromApi, CHART_POLL_MS);
+        return;
+      }
+      try {
+        const res = await fetch("/session", { cache: "no-store" });
+        if (res.ok) {
+          const payload = await res.json();
+          const hist = Array.isArray(payload.history) ? payload.history : [];
+          if (hist.length > 0) {
+            loadChartFromHistory(hist);
+            hydrateScoreHistoryFromSamples(hist);
+            hydrateSessionFromHistory(hist);
+            updateTrendLabel();
+          } else {
+            pushChartSample(bootT, bootS, true);
+          }
+        } else {
+          pushChartSample(bootT, bootS, true);
+        }
+      } catch (e) {
+        console.warn("Session bootstrap failed", e);
+        pushChartSample(bootT, bootS, true);
+      }
+      setInterval(pollFocusDataFromApi, CHART_POLL_MS);
+    }
+
+    bootstrapChartFromStorage();
+    syncLowFocusAlerts(parseScoreFromUi());
+    renderSessionSummary();
+    renderMetricSessionTime(sessionTotalTimeSec);
+
+    window.addEventListener("resize", () => {
+      updateTrendLabel();
+      if (focusLineChart) focusLineChart.resize();
+    });
+
+    /** Recent session window for “today” buckets */
+    function recentScoresForToday() {
+      const take = Math.min(36, scoreHistory.length || 1);
+      if (scoreHistory.length) {
+        return scoreHistory.slice(-take);
+      }
+      return [parseScoreFromUi()];
+    }
+
+    function todayBandFromRecent(recent) {
+      let c80 = 0,
+        c60 = 0,
+        c40 = 0,
+        cLow = 0;
+      for (const s of recent) {
+        if (s >= 80) c80++;
+        else if (s >= 60) c60++;
+        else if (s >= 40) c40++;
+        else cLow++;
+      }
+      const best = Math.max(c80, c60, c40, cLow);
+      if (c80 === best) return "great";
+      if (c60 === best) return "ok";
+      if (c40 === best) return "low";
+      return "struggle";
+    }
+
+    function fallingTipIfNeeded(trend) {
+      return trend.key === "falling"
+        ? " Notice your focus has dipped 📉 — try to minimize distractions!"
+        : "";
+    }
+
+    function assistantReply(userText) {
+      const t = userText.trim().toLowerCase();
+      if (!t) {
+        return "Type something peppy—I’m here! ✨";
+      }
+
+      const live = parseScoreFromUi();
+      const trend = getGraphTrend();
+      const trendPhrase = trend.phrase;
+
+      const isToday =
+        /\b(today|session|right now|this session)\b/.test(t) &&
+        (/\bfocus\b/.test(t) || /\bhow\b/.test(t) || /\bgoing\b/.test(t));
+      const asksHowFocusToday =
+        isToday ||
+        (/how\s+is\s+(?:my\s+)?focus/.test(t) &&
+          (t.includes("today") || !t.includes("mean")));
+
+      if (asksHowFocusToday && /focus/.test(t)) {
+        const band = todayBandFromRecent(recentScoresForToday());
+        const tip = fallingTipIfNeeded(trend);
+        if (band === "great") {
+          return `Great job! Your focus has been strong 🟢 (${live}% live, ${trendPhrase}). Keep it up!${tip}`;
+        }
+        if (band === "ok") {
+          return `Not bad! Some distractions but you can improve 🟡 — you're at ${live}% now, and the graph looks ${trend.label}. ${tip || "You’ve got this!"}`;
+        }
+        if (band === "low") {
+          return `Focus is a bit low 🔴 — live score ${live}%, ${trendPhrase}. Let's refocus!${tip}`;
+        }
+        return `Looks like you're struggling ⚠️ — ${live}% right now, ${trendPhrase}. Take a short break and come back stronger!${tip}`;
+      }
+
+      const wantsMeaning =
+        (t.includes("what") && (t.includes("mean") || t.includes("means"))) ||
+        t.includes("what does my score") ||
+        /what'?s my score/.test(t) ||
+        (t.includes("score") && t.includes("meaning"));
+
+      if (wantsMeaning) {
+        const tip = fallingTipIfNeeded(trend);
+        let bandHint =
+          live >= 80
+            ? "That’s strong, locked-in attention 🟢."
+            : live >= 60
+              ? "Solid engagement with a bit of drift 🟡."
+              : live >= 40
+                ? "You’re in-and-out of deep focus 🔴."
+                : "Lots of distraction showing in this window ⚠️.";
+        return `Your live focus is ${live}% — ${bandHint} On the graph, things look ${trend.label} (${trendPhrase}).${tip}`;
+      }
+
+      const lowOrWhy =
+        (t.includes("why") &&
+          (t.includes("low") ||
+            t.includes("bad") ||
+            t.includes("dropped") ||
+            t.includes("focus"))) ||
+        (t.includes("low") &&
+          (t.includes("focus") || t.includes("score"))) ||
+        t.includes("distracted") ||
+        t.includes("not focused");
+
+      if (lowOrWhy) {
+        return `Your live score is ${live}% and the trend is ${trend.label} (${trendPhrase}). Low stretches usually mean eyes off-screen or splits in attention—reset, face the camera, one tab if you can!${fallingTipIfNeeded(trend)} You’ve got this! 💪`;
+      }
+
+      if (
+        t.includes("improve") ||
+        t.includes("better") ||
+        t.includes("raise") ||
+        t.includes("higher score") ||
+        (t.includes("how") &&
+          (t.includes("score") || t.includes("focus")))
+      ) {
+        return `You’re at ${live}% live; the graph is ${trend.label} 📊. Try eyes on task, fewer switches, and short breaks before you bounce back${trend.key === "falling" ? " — your line has dipped 📉, so cut distractions for a few minutes!" : "!"} 🌟`;
+      }
+
+      if (
+        t.includes("tip") ||
+        t.includes("tips") ||
+        t.includes("help me focus") ||
+        t.includes("stay focused")
+      ) {
+        return `Quick win: 5 focused minutes, one goal (${live}% now, trend ${trend.label}) ⏱️✨${fallingTipIfNeeded(trend)}`;
+      }
+
+      if (
+        t.includes("hello") ||
+        t.includes("hi ") ||
+        t === "hi" ||
+        t.includes("hey")
+      ) {
+        return `Hey! 👋 Live focus is ${live}% and your graph trend is ${trend.label}. Tap a prompt or ask about your score!`;
+      }
+
+      if (t.includes("graph") || t.includes("chart") || t.includes("trend")) {
+        return `Your graph trend is ${trend.label} (${trendPhrase}) and live focus is ${live}% 📈${fallingTipIfNeeded(trend)}`;
+      }
+
+      return `Hmm, I didn’t get that 🤔. Try one of the prompts or check your graph!`;
+    }
+
+    const assistLog = el("assist-log");
+    const assistInput = el("assist-input");
+    const assistForm = el("assist-form");
+
+    function appendMsg(role, text) {
+      const div = document.createElement("div");
+      div.className = "assist-msg " + role;
+      div.textContent = text;
+      assistLog.appendChild(div);
+      assistLog.scrollTop = assistLog.scrollHeight;
+    }
+
+    function sendUserMessage(text) {
+      const trimmed = text.trim();
+      if (!trimmed) return;
+      appendMsg("user", trimmed);
+      appendMsg("bot", assistantReply(trimmed));
+    }
+
+    assistForm.addEventListener("submit", (e) => {
+      e.preventDefault();
+      sendUserMessage(assistInput.value);
+      assistInput.value = "";
+      assistInput.focus();
+    });
+
+    document.getElementById("assist-chips").addEventListener("click", (e) => {
+      const btn = e.target.closest("button[data-prompt]");
+      if (!btn) return;
+      sendUserMessage(btn.getAttribute("data-prompt") || "");
+    });
+
+    appendMsg(
+      "bot",
+      "Hey! 👋 I’m your AI Focus Coach—upbeat, short, emoji-friendly answers! Peek at your live % and the graph trend, or tap a prompt below 🎯"
+    );
+
+    updateTrendLabel();
+  </script>
+</body>
+</html>
